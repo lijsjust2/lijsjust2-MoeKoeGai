@@ -2,21 +2,11 @@
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app
 COPY package*.json ./
-# Remove electron and electron-builder from package.json
-RUN node -e "const fs = require('fs'); const filePath = './package.json'; \
-             let rawdata = fs.readFileSync(filePath); let packageJson = JSON.parse(rawdata); \
-             if (packageJson.devDependencies) { \
-               delete packageJson.devDependencies.electron; \
-               delete packageJson.devDependencies['electron-builder']; \
-             } \
-             if (packageJson.dependencies) { \
-               delete packageJson.dependencies.electron; \
-             } \
-             fs.writeFileSync(filePath, JSON.stringify(packageJson, null, 2));"
-RUN npm install
+# 安装所有依赖，包括开发依赖
+RUN npm install --include=dev
 COPY . .
-# 直接使用 vite build 并设置环境变量
-RUN VITE_APP_API_URL=/api npm run build
+# 直接使用 vite build 命令
+RUN npm run build
 
 # Stage 2: Setup Combined App
 FROM node:20-alpine
