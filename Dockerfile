@@ -1,25 +1,15 @@
-# Stage 1: Build Frontend
-FROM node:20-alpine AS frontend-builder
+# 使用标准的 Node.js 镜像（非 alpine，避免依赖问题）
+FROM node:20 AS frontend-builder
 
 # 设置工作目录
 WORKDIR /app
 
-# 安装系统依赖
-RUN apk add --no-cache \
-    git \
-    python3 \
-    make \
-    g++ \
-    curl \
-    && rm -rf /var/cache/apk/*
-
 # 复制 package.json 和 package-lock.json
 COPY package*.json ./
 
-# 清理 electron 相关依赖（减少构建时间）
-RUN node -e "const fs = require('fs'); const path = require('path'); \
-             const pkgPath = path.join(__dirname, 'package.json'); \
-             const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8')); \
+# 移除 electron 相关依赖
+RUN node -e "const fs = require('fs'); \
+             const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf8')); \
              if (pkg.devDependencies) { \
                delete pkg.devDependencies.electron; \
                delete pkg.devDependencies['electron-builder']; \
@@ -27,50 +17,55 @@ RUN node -e "const fs = require('fs'); const path = require('path'); \
              if (pkg.dependencies) { \
                delete pkg.dependencies.electron; \
              } \
-             fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2)); \
-             console.log('清理后的 package.json:', JSON.stringify(pkg, null, 2));"
+             fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2)); \
+             console.log('Cleaned up package.json');"
 
-# 安装依赖（增加详细日志）
-RUN npm install --verbose
+# 安装依赖
+RUN npm install --legacy-peer-deps
 
-# 复制所有源代码
-COPY . .
+# 复制必要的构建文件
+COPY vite.config.js ./
+COPY index.html ./
+COPY src ./src
+COPY public ./public
+COPY build ./build
+COPY docs ./docs
 
-# 查看当前目录结构（调试用）
+# 查看目录结构
 RUN ls -la
+RUN ls -la src
+RUN ls -la public
 
-# 构建前端应用（增加详细日志）
-RUN npm run build --verbose
+# 构建前端应用
+RUN echo "Building frontend..." && npm run build
 
-# Stage 2: Setup Combined App
+# Stage 2: 生产环境
 FROM node:20-alpine
 
 # 设置工作目录
 WORKDIR /app
 
-# 安装系统依赖
-RUN apk add --no-cache \
-    nginx \
-    && rm -rf /var/cache/apk/*
+# 安装 nginx
+RUN apk add --no-cache nginx
 
 # 复制 API 代码
 COPY ./api ./api
 
 # 安装 API 依赖
 WORKDIR /app/api
-RUN npm install --production --verbose
+RUN npm install --production
 
 # 重置工作目录
 WORKDIR /app
 
-# 从构建阶段复制前端静态文件
+# 复制构建的前端文件
 COPY --from=frontend-builder /app/dist ./dist
 
-# 复制 Nginx 配置
+# 复制 nginx 配置
 COPY nginx.conf /etc/nginx/nginx.conf
 
 # 暴露端口
 EXPOSE 8080 6521
 
 # 启动命令
-CMD ["sh", "-c", "echo 'Starting MoeKoe Music...'; echo 'Client will be available at http://localhost:8080/'; cd /app/api && node app.js & nginx -g 'daemon off;'"]
+CMD ["sh", "-c", "echo 'Starting MoeKoe Music...'; cd /app/api && node app.js & nginx -g 'daemon off;'"]
