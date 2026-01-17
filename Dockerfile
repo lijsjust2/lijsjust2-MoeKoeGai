@@ -1,11 +1,11 @@
-# 使用标准的 Node.js 镜像（非 alpine，避免依赖问题）
+# 使用标准的 Node.js 镜像
 FROM node:20 AS frontend-builder
 
 # 设置工作目录
 WORKDIR /app
 
-# 复制 package.json 和 package-lock.json
-COPY package*.json ./
+# 复制整个项目目录
+COPY . .
 
 # 移除 electron 相关依赖
 RUN node -e "const fs = require('fs'); \
@@ -22,19 +22,6 @@ RUN node -e "const fs = require('fs'); \
 
 # 安装依赖
 RUN npm install --legacy-peer-deps
-
-# 复制必要的构建文件
-COPY vite.config.js ./
-COPY index.html ./
-COPY src ./src
-COPY public ./public
-COPY build ./build
-COPY docs ./docs
-
-# 查看目录结构
-RUN ls -la
-RUN ls -la src
-RUN ls -la public
 
 # 构建前端应用
 RUN echo "Building frontend..." && npm run build
