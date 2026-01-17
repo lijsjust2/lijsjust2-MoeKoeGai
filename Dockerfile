@@ -15,7 +15,8 @@ RUN node -e "const fs = require('fs'); const filePath = './package.json'; \
              fs.writeFileSync(filePath, JSON.stringify(packageJson, null, 2));"
 RUN npm install
 COPY . .
-RUN npm run build:docker
+# 直接使用 vite build 并设置环境变量
+RUN VITE_APP_API_URL=/api npm run build
 
 # Stage 2: Setup Combined App
 FROM node:20-alpine
@@ -46,7 +47,4 @@ COPY nginx.conf /etc/nginx/nginx.conf
 
 # Command to run both services
 # API runs from /app/api directory, frontend served by Nginx
-# CMD ["sh", "-c", "cd /app/api && node app.js & nginx -g 'daemon off;'"]
-CMD sh -c "\
-  echo 'client running @ http://127.0.0.1:8080/'; \
-  cd /app/api && node app.js & nginx -g 'daemon off;'"
+CMD ["sh", "-c", "echo 'client running @ http://127.0.0.1:8080/'; cd /app/api && node app.js & nginx -g 'daemon off;'"]
